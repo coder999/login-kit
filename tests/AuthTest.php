@@ -24,7 +24,8 @@ final class AuthTest extends TestCase
             username TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            last_login TEXT NULL
+            last_login TEXT NULL,
+            role TEXT NOT NULL DEFAULT \'user\'
         )');
         $this->pdo->exec('CREATE TABLE login_attempts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -296,5 +297,81 @@ final class AuthTest extends TestCase
 
         $this->assertFalse($auth->attemptLogin('eve', 'pw'));
         $this->assertArrayNotHasKey('user_id', $_SESSION);
+    }
+
+    private function signInAs(string $username, ?string $role = null): void
+    {
+        if ($role === null) {
+            $this->pdo->prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
+                ->execute([$username, 'x']);
+        } else {
+            $this->pdo->prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)')
+                ->execute([$username, 'x', $role]);
+        }
+        $_SESSION['user_id'] = (int)$this->pdo->lastInsertId();
+    }
+
+    #[RunInSeparateProcess]
+    public function testCurrentUserIncludesRoleDefaultingToUser(): void
+    {
+        $this->signInAs('alice');
+
+        $this->assertSame('user', $this->auth->currentUser()['role']);
+    }
+
+    #[RunInSeparateProcess]
+    public function testHasRoleIsFalseWithNoSession(): void
+    {
+        $this->assertFalse($this->auth->hasRole('user'));
+        $this->assertFalse($this->auth->hasRole(Auth::SUPERADMIN));
+    }
+
+    #[RunInSeparateProcess]
+    public function testHasRoleMatchesOnlyTheUsersOwnRole(): void
+    {
+        $this->signInAs('wife', 'family');
+
+        $this->assertTrue($this->auth->hasRole('family'));
+        $this->assertFalse($this->auth->hasRole('editor'));
+        $this->assertFalse($this->auth->hasRole(Auth::SUPERADMIN));
+    }
+
+    #[RunInSeparateProcess]
+    public function testSuperadminHasEveryRole(): void
+    {
+        $this->signInAs('mark', Auth::SUPERADMIN);
+
+        $this->assertTrue($this->auth->hasRole(Auth::SUPERADMIN));
+        $this->assertTrue($this->auth->hasRole('family'));
+        $this->assertTrue($this->auth->hasRole('anything-at-all'));
+    }
+
+    #[RunInSeparateProcess]
+    public function testBootstrapRefusesAnAlreadyStartedSession(): void
+    {
+        // setUp() has started a session; the database handler can no
+        // longer take effect for it.
+        $this->expectException(\LogicException::class);
+        Auth::bootstrap($this->pdo, ['cookie_domain' => '.nexus.local']);
+    }
+
+    #[RunInSeparateProcess]
+    public function testBootstrapStoresSessionsInTheDatabase(): void
+    {
+        $this->pdo->exec('CREATE TABLE sessions (
+            id TEXT PRIMARY KEY,
+            data TEXT NOT NULL,
+            last_activity TEXT NOT NULL
+        )');
+        session_write_close();
+
+        $auth = Auth::bootstrap($this->pdo, ['cookie_domain' => '.nexus.local']);
+        $auth->sessionStart();
+        $_SESSION['probe'] = 'stored';
+        session_write_close();
+
+        $data = $this->pdo->query('SELECT data FROM sessions')->fetchColumn();
+        $this->assertIsString($data);
+        $this->assertStringContainsString('stored', $data);
     }
 }

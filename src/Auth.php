@@ -8,6 +8,9 @@ use PDO;
 
 final class Auth
 {
+    /** The role that passes every hasRole() check. */
+    public const SUPERADMIN = 'superadmin';
+
     private PDO $pdo;
     private string $cookieName;
     private string $cookieDomain;
@@ -26,6 +29,22 @@ final class Auth
         $this->cookieSecure = $options['cookie_secure'] ?? true;
         $this->loginMaxAttempts = $options['login_max_attempts'] ?? 8;
         $this->loginWindowSeconds = $options['login_window_seconds'] ?? 900;
+    }
+
+    /**
+     * Install the database session handler and return a ready Auth.
+     *
+     * The handler only takes effect for sessions started after it is
+     * installed, so this refuses to run once a session is already active
+     * rather than silently leaving that request on file-based sessions.
+     */
+    public static function bootstrap(PDO $pdo, array $options = []): self
+    {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            throw new \LogicException('Auth::bootstrap() must run before any session is started.');
+        }
+        session_set_save_handler(new DbSessionHandler($pdo), true);
+        return new self($pdo, $options);
     }
 
     public function sessionStart(): void
@@ -51,7 +70,7 @@ final class Auth
         if (empty($_SESSION['user_id'])) {
             return null;
         }
-        $st = $this->pdo->prepare('SELECT id, username, last_login FROM users WHERE id = ?');
+        $st = $this->pdo->prepare('SELECT id, username, role, last_login FROM users WHERE id = ?');
         $st->execute([$_SESSION['user_id']]);
         $user = $st->fetch(PDO::FETCH_ASSOC);
         if ($user === false) {
@@ -67,6 +86,27 @@ final class Auth
         if ($user === null) {
             header('Location: ' . $loginUrl);
             exit;
+        }
+        return $user;
+    }
+
+    /**
+     * Whether the signed-in user holds $role. SUPERADMIN holds every role.
+     * Role names are the consuming app's own; this library defines only
+     * SUPERADMIN.
+     */
+    public function hasRole(string $role): bool
+    {
+        $user = $this->currentUser();
+        return $user !== null && ($user['role'] === $role || $user['role'] === self::SUPERADMIN);
+    }
+
+    public function requireRole(string $role, string $loginUrl = 'login.php'): array
+    {
+        $user = $this->requireLogin($loginUrl);
+        if (!$this->hasRole($role)) {
+            http_response_code(403);
+            exit('You do not have access to this page.');
         }
         return $user;
     }

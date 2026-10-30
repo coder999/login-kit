@@ -27,23 +27,36 @@ architecture change.
   local disk, so session state doesn't depend on consuming apps sharing a
   filesystem.
 
-This package ships no login-page HTML and no authorization/roles system —
-see the design doc's "Authn vs authz" section for why.
+This package ships no login-page HTML. It has one role per user (see
+[Roles](#roles)); which roles exist and what they may do is up to each app.
 
 ## Using this in a consuming app
 
 ```php
 // Configure TLS and PDO error handling as shown in the onboarding guide.
-$pdo = new PDO($identityDsn, $identityUser, $identityPass, $identityPdoOptions);
-$auth = new \Coder999\SingleAuth\Auth($pdo, [
-    'cookie_domain' => $isLocal ? '.yourdomain.local' : '.yourdomain.com',
+$pdo = new PDO($dsn, $dbUser, $dbPass, $pdoOptions);
+// Installs the database session handler, then returns the Auth. Call it
+// before anything starts a session; it throws LogicException otherwise.
+$auth = \Coder999\SingleAuth\Auth::bootstrap($pdo, [
     'cookie_secure' => !$isLocal,
 ]);
 
-session_set_save_handler(new \Coder999\SingleAuth\DbSessionHandler($pdo), true);
-
 $user = $auth->requireLogin(); // redirects to login.php if not logged in
 ```
+
+### Roles
+
+Every user has exactly one `role`, a short string that defaults to `user`.
+`Auth::SUPERADMIN` (`superadmin`) is the only role this library names: it
+passes every check. Every other role name is the app's own choice.
+
+```php
+if ($auth->hasRole('editor')) { /* … */ }           // false when signed out
+$user = $auth->requireRole('editor');               // login redirect, then 403
+```
+
+`currentUser()` includes `role`. Set roles with the app's own account
+management; the library has no UI or setter for them.
 
 Protect the password form with `csrfField()` and call `csrfCheck()` before
 attempting authentication. On the login form, `attemptLogin()` does **not** consult `loginThrottled()`

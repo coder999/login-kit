@@ -10,12 +10,15 @@ usernames, and production topology there.
 The package can be deployed two ways. The reasoning is recorded in
 [future-directions.md](future-directions.md).
 
-- **Shared identity** is only for the operator's own personal and intranet
-  sites, and they share one login. Prefer putting such a site behind the
-  existing forward-auth gate site in `vps-infra`. The site then needs no
-  package, no identity database user, and no CA mount. The gate currently
-  answers allow/deny only, so a site that needs to know *who* is signed in
-  must embed the package instead. In that case, follow every section below.
+- **Shared identity** is for the operator's own personal and intranet sites,
+  which share one login. **It has exactly one deployment:** the operator's
+  admin console, which is also the reverse-proxy forward-auth gate. A
+  private site goes *behind that gate* and embeds nothing: no package, no
+  identity database user, no CA mount. The gate is moving to pass the
+  signed-in user and role to the site as request headers. Its contract and
+  hostnames live in `vps-infra`, which is private. Sections 1 to 6 below
+  describe that one deployment; don't add a second app to the shared
+  identity database.
 - **Standalone** is for every other site. It has its own credentials, which
   are never shared with another site. Skip section 1 except for the
   authorization and account-provisioning bullets, and do the following
@@ -92,19 +95,20 @@ In the app's bootstrap, before output or any session access:
 
 ```php
 use Coder999\SingleAuth\Auth;
-use Coder999\SingleAuth\DbSessionHandler;
 use Coder999\SingleAuth\Passkeys;
 
 // These values come from validated app configuration, not request input.
+// The TLS options apply when the database requires TLS, as the shared
+// identity database does.
 $pdo = new PDO($identityDsn, $identityUser, $identityPassword, [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     PDO::MYSQL_ATTR_SSL_CA => $identityCaPath,
     PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => true,
 ]);
-session_set_save_handler(new DbSessionHandler($pdo), true);
-$auth = new Auth($pdo, [
-    'cookie_domain' => $cookieDomain,
+// Installs the database session handler before any session starts.
+$auth = Auth::bootstrap($pdo, [
+    'cookie_domain' => $cookieDomain,   // omit for a standalone site
     'cookie_secure' => $isProductionHttps,
 ]);
 $passkeys = new Passkeys($pdo, $auth, [

@@ -3,7 +3,7 @@
 --
 -- Host: single-auth-mariadb    Database: single_auth
 -- ------------------------------------------------------
--- Server version	11.8.8-MariaDB-ubu2404
+-- Server version	11.8.9-MariaDB-ubu2404
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -94,6 +94,7 @@ CREATE TABLE `users` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `last_login` datetime DEFAULT NULL,
   `webauthn_user_handle` varchar(64) DEFAULT NULL,
+  `role` varchar(32) NOT NULL DEFAULT 'user',
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`),
   UNIQUE KEY `uniq_webauthn_user_handle` (`webauthn_user_handle`)
@@ -123,5 +124,6 @@ LOCK TABLES `schema_migrations` WRITE;
 INSERT INTO `schema_migrations` (version) VALUES
   ('20260812174312'),
   ('20260813020513'),
-  ('20260914115641');
+  ('20260914115641'),
+  ('20261030215729');
 UNLOCK TABLES;
