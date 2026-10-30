@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Coder999\SingleAuth;
+namespace Coder999\LoginKit;
 
 use PDO;
 use SessionHandlerInterface;

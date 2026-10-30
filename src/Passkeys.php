@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Coder999\SingleAuth;
+namespace Coder999\LoginKit;
 
 use Cose\Algorithm\Signature\ECDSA\ES256;
 use Cose\Algorithm\Signature\RSA\RS256;
@@ -89,7 +89,7 @@ final class Passkeys
         // cookie domain, so a '.Example.com' there would otherwise make
         // every ceremony fail, silently and unrecognisably.
         $this->rpId = strtolower((string)$options['rp_id']);
-        $this->rpName = (string)($options['rp_name'] ?? 'single-auth');
+        $this->rpName = (string)($options['rp_name'] ?? 'login-kit');
         $this->challengeTtl = (int)($options['challenge_ttl'] ?? 120);
     }
 

@@ -1,4 +1,4 @@
-# single-auth
+# login-kit
 
 A PHP login kit: password login, CSRF, login throttling, database-backed
 sessions, and passkeys, so a new site does not rebuild them. Deploy it in
@@ -20,9 +20,9 @@ architecture change.
 
 ## What this is
 
-- `Coder999\SingleAuth\Auth` — session bootstrap, identity lookup, CSRF
+- `Coder999\LoginKit\Auth` — session bootstrap, identity lookup, CSRF
   helpers, login/logout, login throttling.
-- `Coder999\SingleAuth\DbSessionHandler` — a `SessionHandlerInterface`
+- `Coder999\LoginKit\DbSessionHandler` — a `SessionHandlerInterface`
   implementation backing PHP sessions with a database table instead of
   local disk, so session state doesn't depend on consuming apps sharing a
   filesystem.
@@ -37,7 +37,7 @@ This package ships no login-page HTML. It has one role per user (see
 $pdo = new PDO($dsn, $dbUser, $dbPass, $pdoOptions);
 // Installs the database session handler, then returns the Auth. Call it
 // before anything starts a session; it throws LogicException otherwise.
-$auth = \Coder999\SingleAuth\Auth::bootstrap($pdo, [
+$auth = \Coder999\LoginKit\Auth::bootstrap($pdo, [
     'cookie_secure' => !$isLocal,
 ]);
 
@@ -112,8 +112,8 @@ required `rp_id` is the configured cookie domain with its leading dot
 removed:
 
 ```php
-use Coder999\SingleAuth\Auth;
-use Coder999\SingleAuth\Passkeys;
+use Coder999\LoginKit\Auth;
+use Coder999\LoginKit\Passkeys;
 
 $cookieDomain = $isLocal ? '.yourdomain.local' : '.yourdomain.com';
 $auth = new Auth($pdo, [
@@ -122,7 +122,7 @@ $auth = new Auth($pdo, [
 ]);
 $passkeys = new Passkeys($pdo, $auth, [
     'rp_id' => ltrim($cookieDomain, '.'),
-    'rp_name' => 'Your application', // optional; defaults to single-auth
+    'rp_name' => 'Your application', // optional; defaults to login-kit
 ]);
 ```
 
@@ -173,13 +173,30 @@ cannot expose files below `vendor/` directly:
 declare(strict_types=1);
 
 header('Content-Type: text/javascript; charset=utf-8');
-readfile(__DIR__ . '/vendor/coder999/single-auth/assets/passkey.js');
+readfile(__DIR__ . '/vendor/coder999/login-kit/assets/passkey.js');
 ```
 
 Import that endpoint as an ES module and call `registerPasskey()` or
 `loginWithPasskey()`. Passkeys require a secure browser context and this
 library accepts only HTTPS origins. Plain-HTTP local development therefore
 uses the existing password login path.
+
+## Upgrading to 0.6.0
+
+0.6.0 renames the package from `coder999/single-auth` to `coder999/login-kit`.
+The old GitHub URL redirects, and older tags still install under the old
+name. To move to 0.6.0:
+
+1. In `composer.json`, require `"coder999/login-kit": "^0.6.0"` instead of
+   `coder999/single-auth`. Point the `vcs` repository at
+   `https://github.com/coder999/login-kit`.
+2. Replace `Coder999\SingleAuth\` with `Coder999\LoginKit\` in every `use`
+   line and every fully qualified name.
+3. Apply migration `20261030215729_add_user_role` before deploying. It adds
+   `users.role`, which `currentUser()` now selects.
+
+Optionally, replace `session_set_save_handler(new DbSessionHandler($pdo),
+true)` plus `new Auth(...)` with a single `Auth::bootstrap($pdo, [...])`.
 
 ## Database Migrations (dbmate)
 

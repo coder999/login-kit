@@ -1,6 +1,6 @@
 {
-    "name": "coder999/single-auth",
-    "description": "Shared PHP identity/session library for a primary domain and its subdomain apps",
+    "name": "coder999/login-kit",
+    "description": "PHP login kit: password and passkey login, CSRF, throttling, database sessions and roles",
     "type": "library",
     "license": "MIT",
     "require": {
@@ -13,12 +13,12 @@
     },
     "autoload": {
         "psr-4": {
-            "Coder999\\SingleAuth\\": "src/"
+            "Coder999\\LoginKit\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Coder999\\SingleAuth\\Tests\\": "tests/"
+            "Coder999\\LoginKit\\Tests\\": "tests/"
         }
     }
 }

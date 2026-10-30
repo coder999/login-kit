@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Coder999\SingleAuth\Tests;
+namespace Coder999\LoginKit\Tests;
 
 use CBOR\ByteStringObject;
 use CBOR\MapObject;
 use CBOR\NegativeIntegerObject;
 use CBOR\TextStringObject;
 use CBOR\UnsignedIntegerObject;
-use Coder999\SingleAuth\Passkeys;
+use Coder999\LoginKit\Passkeys;
 use Cose\Algorithm\Signature\ECDSA\ES256;
 use Cose\Key\Ec2Key;
 use Cose\Key\Key;

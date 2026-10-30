@@ -1,6 +1,6 @@
 // Browser half of the WebAuthn ceremonies. Protocol plumbing only: it
 // renders nothing and styles nothing, so it does not contradict
-// single-auth shipping no login-page HTML.
+// login-kit shipping no login-page HTML.
 //
 // Consumers cannot serve this file directly -- every site's nginx denies
 // /vendor/ -- so each one serves it through a small PHP passthrough.

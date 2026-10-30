@@ -1,7 +1,9 @@
-# Onboarding a new single-auth site
+# Onboarding a new login-kit site
 
-This checklist targets the v0.5.0 API and was checked against the library
-and a working consumer on 2026-09-14. Infrastructure configuration belongs
+This checklist targets the v0.6.0 API. Sections 2–6 were checked against
+v0.5.0 and a working consumer on 2026-09-14; v0.6.0 renamed the package
+to `coder999/login-kit` (namespace `Coder999\LoginKit`) and added roles
+and `Auth::bootstrap()`. Infrastructure configuration belongs
 in the private `vps-infra` repository; keep real credentials, database
 usernames, and production topology there.
 
@@ -25,7 +27,7 @@ The package can be deployed two ways. The reasoning is recorded in
   instead:
   - Point the PDO at the app's own database. TLS options apply only if that
     database requires them.
-  - Copy `vendor/coder999/single-auth/db/migrations/*.sql` into the app's own
+  - Copy `vendor/coder999/login-kit/db/migrations/*.sql` into the app's own
     dbmate migrations directory. Repeat this whenever you bump the package,
     and apply the files with the app's normal migration process. The
     timestamped filenames keep them ordered alongside the app's own
@@ -79,9 +81,9 @@ Merge this into the app's Composer configuration:
 ```json
 {
   "repositories": [
-    { "type": "vcs", "url": "https://github.com/coder999/single-auth" }
+    { "type": "vcs", "url": "https://github.com/coder999/login-kit" }
   ],
-  "require": { "php": ">=8.2", "ext-pdo": "*", "coder999/single-auth": "^0.5.0" }
+  "require": { "php": ">=8.2", "ext-pdo": "*", "coder999/login-kit": "^0.6.0" }
 }
 ```
 
@@ -94,8 +96,8 @@ consumers do not need credentials to access its source repository.
 In the app's bootstrap, before output or any session access:
 
 ```php
-use Coder999\SingleAuth\Auth;
-use Coder999\SingleAuth\Passkeys;
+use Coder999\LoginKit\Auth;
+use Coder999\LoginKit\Passkeys;
 
 // These values come from validated app configuration, not request input.
 // The TLS options apply when the database requires TLS, as the shared
@@ -253,8 +255,8 @@ User preference recorded 2026-09-14:
 5. Retain a management page for listing, adding, and deleting the signed-in
    user's passkeys, even after opting out of prompts.
 
-Prompt UI and the opt-out preference are app-owned features; single-auth
-v0.5.0 does not implement their storage or rendering. Store the preference
+Prompt UI and the opt-out preference are app-owned features; login-kit
+does not implement their storage or rendering. Store the preference
 in the app's own account settings, using that app's migration process, and
 protect changes with authentication, authorization, and CSRF. Do not silently
 add a column to the shared identity schema for one app's preference.

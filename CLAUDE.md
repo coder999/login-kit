@@ -1,4 +1,4 @@
-# single-auth — Claude instructions
+# login-kit — Claude instructions
 
 ## Database schema changes
 
@@ -98,7 +98,7 @@ GitHub, not just local clones — code search alone also misses some:
 ```bash
 for r in $(gh repo list coder999 --limit 200 --json name --jq '.[].name'); do
   gh api "repos/coder999/$r/contents/composer.json" --jq .content 2>/dev/null \
-    | base64 -d 2>/dev/null | grep -q 'coder999/single-auth' && echo "$r"
+    | base64 -d 2>/dev/null | grep -qE 'coder999/(login-kit|single-auth)' && echo "$r"
 done
 ```
 

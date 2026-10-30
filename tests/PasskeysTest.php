@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Coder999\SingleAuth\Tests;
+namespace Coder999\LoginKit\Tests;
 
-use Coder999\SingleAuth\Auth;
-use Coder999\SingleAuth\Passkeys;
+use Coder999\LoginKit\Auth;
+use Coder999\LoginKit\Passkeys;
 use InvalidArgumentException;
 use PDO;
 use PHPUnit\Framework\Attributes\DataProvider;
