@@ -184,8 +184,13 @@ uses the existing password login path.
 ## Upgrading to 0.6.0
 
 0.6.0 renames the package from `coder999/single-auth` to `coder999/login-kit`.
-The old GitHub URL redirects, and older tags still install under the old
-name. To move to 0.6.0:
+The old GitHub URL redirects. A site still requiring `coder999/single-auth`
+keeps working from its lock file: `composer install` and partial updates of
+other packages succeed. Composer can no longer *resolve* the old name,
+though, so a full `composer update` (or any update of single-auth itself)
+fails with "found in the lock file but not in remote repositories" until
+the site moves to 0.6.0. Verified 2026-10-30 against a copy of a consumer
+on `^0.3.0`. To move to 0.6.0:
 
 1. In `composer.json`, require `"coder999/login-kit": "^0.6.0"` instead of
    `coder999/single-auth`. Point the `vcs` repository at
