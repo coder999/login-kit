@@ -1,16 +1,22 @@
 # single-auth
 
-Shared PHP identity/session library for a primary domain and its
-subdomain apps. One login, one session, shared across every consuming
-app via a cookie scoped to your chosen domain and a dedicated identity
-database.
+A PHP login kit: password login, CSRF, login throttling, database-backed
+sessions, and passkeys, so a new site does not rebuild them. Deploy it in
+one of two ways:
+
+- **Standalone.** The site has its own database and its own credentials.
+  This is the default for any new site.
+- **Shared identity.** Sibling sites under one parent domain share an
+  identity database and a cookie, giving one login across all of them.
+  This is reserved for the operator's own personal sites. Despite the
+  package name, it is the less common deployment.
 
 Start with the [new-site onboarding guide](docs/onboarding.md).
 The [original design](docs/superpowers/specs/2026-08-12-single-auth-design.md)
 and implementation plans are historical context, not deployment checklists.
-[Future directions](docs/future-directions.md) records the open
-library-vs-OIDC question, and why it is deliberately tabled — read it before
-proposing an architecture change.
+[Future directions](docs/future-directions.md) records why this stays a
+library rather than moving to OIDC. Read it before proposing an
+architecture change.
 
 ## What this is
 

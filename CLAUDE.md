@@ -87,15 +87,18 @@ application code. Consumers authenticate through `attemptLogin()` or
 
 ## Consumers
 
-Four apps require this package via a Composer VCS repository entry
+Five apps require this package via a Composer VCS repository entry
 pointing at this (public) GitHub repo — no Composer auth token needed to
-fetch it: `marktuttlemd`, `mdproductivity`, `console` and
-`3mensioxmlparser`. Don't trust that list without re-deriving it; from
-`~/docker/html-local`:
+fetch it: `marktuttlemd`, `mdproductivity`, `console`,
+`3mensioxmlparser` and `archive-gate` (confirmed 2026-10-27). Don't trust
+that list without re-deriving it. Not every consumer is cloned under
+`~/docker/html-local` (`archive-gate` isn't), so check every repo on
+GitHub, not just local clones — code search alone also misses some:
 
 ```bash
-for d in */; do d=${d%/}; [ -f "$d/composer.json" ] || continue
-  grep -q 'coder999/single-auth' "$d/composer.json" && echo "$d"
+for r in $(gh repo list coder999 --limit 200 --json name --jq '.[].name'); do
+  gh api "repos/coder999/$r/contents/composer.json" --jq .content 2>/dev/null \
+    | base64 -d 2>/dev/null | grep -q 'coder999/single-auth' && echo "$r"
 done
 ```
 
@@ -110,10 +113,11 @@ This repo is **public**. Keep production usernames, grants, credentials,
 and network topology in `vps-infra` (private). Inspect its current site
 configuration rather than assuming the identity database publishes a port.
 
-At least one non-Composer consumer also reaches `single-auth-mariadb`
-directly via a `vps-infra` nginx/PHP gate rather than through this
-library. `vps-infra/sites/` is authoritative for who talks to that
-database; this file is only authoritative for who uses this package.
+`archive-gate` is a forward-auth gate: sites placed behind it in
+`vps-infra` are protected by the shared login without embedding this
+package themselves. `vps-infra/sites/` is authoritative for who talks to
+that database and which sites sit behind the gate; this file is only
+authoritative for who uses this package.
 
 See the design doc for the full authn/authz split rationale.
 

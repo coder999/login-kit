@@ -1,13 +1,31 @@
 # Future directions
 
-**Status: open question, deliberately tabled 2026-09-14. No decision has been
-made and none is pending.**
+**Status: decided 2026-10-28 — stay a library; no OIDC.** Tabled 2026-09-14;
+the analysis below is kept as the reasoning behind the decision.
+
+## Decision
+
+The deciding question below got its answer. Some sites will have users other
+than the operator, but those users never need one login across sites — only
+the operator does, and only on the operator's own sites. So the package keeps
+both roles, as two ways of deploying the same code rather than two products:
+
+- **Shared identity** is for the operator's own personal and intranet sites
+  only, consolidated under one parent domain so one cookie and one passkey
+  RP ID cover all of them. A site can join without embedding this package by
+  sitting behind a reverse-proxy forward-auth gate that does.
+- **Standalone** (library-only mode, below) is the default for every other
+  site: its own database, its own credentials, a host-only cookie.
+
+No OIDC client, OIDC provider, or pluggable verifier layer is planned.
+Revisit only if a site on another domain needs single sign-on for
+non-operator users, or if enough off-the-shelf apps that only accept OIDC
+need the operator's login.
 
 This document exists so the architecture question below is not rediscovered
 and re-argued from scratch every time someone reads the onboarding guide and
 finds it long. If you are about to propose replacing this library, read this
-first — the tradeoffs are already mapped, and the reason nothing was chosen is
-that the deciding question is a product question, not a technical one.
+first — the tradeoffs are already mapped.
 
 ## The question
 
@@ -124,10 +142,10 @@ Note that this is not a one-way door. Migrating a standalone site to OIDC
 later is a contained change: the callback replaces the login form, and the
 rest of the app keeps using its own local session exactly as before.
 
-## Meanwhile
+## Standing rules
 
-- **Do not add another consumer to a shared identity database** without
-  deciding this first. Each one makes both futures more expensive.
+- **Do not add a consumer to the shared identity database unless it is one
+  of the operator's own sites.** Everything else is standalone.
 - **Do not add per-site authentication features to consuming apps.** If a
   login capability is worth having, it belongs in this library.
 - **Do not build an OIDC provider here.** If the OIDC path is chosen, adopt an

@@ -5,7 +5,35 @@ and a working consumer on 2026-09-14. Infrastructure configuration belongs
 in the private `vps-infra` repository; keep real credentials, database
 usernames, and production topology there.
 
-## 1. Decide identity scope and provision access
+## 0. Choose a path
+
+The package can be deployed two ways. The reasoning is recorded in
+[future-directions.md](future-directions.md).
+
+- **Shared identity** is only for the operator's own personal and intranet
+  sites, and they share one login. Prefer putting such a site behind the
+  existing forward-auth gate site in `vps-infra`. The site then needs no
+  package, no identity database user, and no CA mount. The gate currently
+  answers allow/deny only, so a site that needs to know *who* is signed in
+  must embed the package instead. In that case, follow every section below.
+- **Standalone** is for every other site. It has its own credentials, which
+  are never shared with another site. Skip section 1 except for the
+  authorization and account-provisioning bullets, and do the following
+  instead:
+  - Point the PDO at the app's own database. TLS options apply only if that
+    database requires them.
+  - Copy `vendor/coder999/single-auth/db/migrations/*.sql` into the app's own
+    dbmate migrations directory. Repeat this whenever you bump the package,
+    and apply the files with the app's normal migration process. The
+    timestamped filenames keep them ordered alongside the app's own
+    migrations.
+  - Leave `cookie_domain` at its default (a host-only cookie). Set `rp_id`
+    explicitly to the site's own hostname.
+  - Keep app-specific user fields in an app-owned table keyed by `users.id`,
+    for example `profiles (user_id → users.id, …)`. Never add columns to the
+    package's tables. Package migrations must stay applicable as shipped.
+
+## 1. Decide identity scope and provision access (shared identity)
 
 - Decide whether this app joins an existing identity database or needs an
   independent one. Sharing this database shares identities, credentials,
