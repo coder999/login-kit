@@ -87,13 +87,17 @@ application code. Consumers authenticate through `attemptLogin()` or
 
 ## Consumers
 
-Five apps require this package via a Composer VCS repository entry
-pointing at this (public) GitHub repo — no Composer auth token needed to
-fetch it: `marktuttlemd`, `mdproductivity`, `console`,
-`3mensioxmlparser` and `archive-gate` (confirmed 2026-10-27). Don't trust
-that list without re-deriving it. Not every consumer is cloned under
-`~/docker/html-local` (`archive-gate` isn't), so check every repo on
-GitHub, not just local clones — code search alone also misses some:
+Two apps require this package via a Composer VCS repository entry pointing
+at this (public) GitHub repo, re-derived 2026-10-31 after the admin panel
+plan's Phase 6: `admin-console` (`coder999/login-kit`, the fleet's one
+login and gate at admin.marktuttle.dev) and `finance` (a standalone site
+on nexus with its own identity database, still on the old name
+`coder999/single-auth` ^0.5.0 and due a bump). `marktuttlemd`,
+`mdproductivity`, `console`, `3mensioxmlparser` and `archive-gate` used to
+require it; the first four now sit behind admin-console's gate and
+`archive-gate` is retired. Don't trust this list without re-deriving it.
+Not every consumer is cloned under `~/docker/html-local`, so check every
+repo on GitHub, not just local clones — code search alone also misses some:
 
 ```bash
 for r in $(gh repo list coder999 --limit 200 --json name --jq '.[].name'); do
@@ -102,22 +106,17 @@ for r in $(gh repo list coder999 --limit 200 --json name --jq '.[].name'); do
 done
 ```
 
-Each holds its own dedicated MySQL user scoped to `single_auth.*`,
-alongside its own app-database credentials. The design doc
-(`docs/superpowers/specs/2026-08-12-single-auth-design.md`) describes a
-single shared `identity_auth` user for this — that is **not** what was
-built. Production gives each consumer its own user, which is the better
-arrangement; the doc is stale on this point. Confirmed 2026-09-13.
+Production's shared `single_auth` database now has one application user,
+admin-console's; the per-consumer users were dropped in Phase 6.
 
 This repo is **public**. Keep production usernames, grants, credentials,
 and network topology in `vps-infra` (private). Inspect its current site
 configuration rather than assuming the identity database publishes a port.
 
-`archive-gate` is a forward-auth gate: sites placed behind it in
-`vps-infra` are protected by the shared login without embedding this
-package themselves. `vps-infra/sites/` is authoritative for who talks to
-that database and which sites sit behind the gate; this file is only
-authoritative for who uses this package.
+Sites protected by the shared login no longer embed this package: they sit
+behind admin-console's `fleet-gate` in `vps-infra`, which is authoritative
+for which sites are gated; this file is only authoritative for who uses
+this package.
 
 See the design doc for the full authn/authz split rationale.
 
