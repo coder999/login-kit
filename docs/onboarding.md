@@ -16,9 +16,10 @@ The package can be deployed two ways. The reasoning is recorded in
   which share one login. **It has exactly one deployment:** the operator's
   admin console, which is also the reverse-proxy forward-auth gate. A
   private site goes *behind that gate* and embeds nothing: no package, no
-  identity database user, no CA mount. The gate is moving to pass the
-  signed-in user and role to the site as request headers. Its contract and
-  hostnames live in `vps-infra`, which is private. Sections 1 to 6 below
+  identity database user, no CA mount. The gate passes the signed-in user,
+  id and role to the site as request headers, and the site's web server
+  must accept those headers only from the reverse proxy. The contract,
+  hostnames and that check live in `vps-infra`, which is private. Sections 1 to 6 below
   describe that one deployment; don't add a second app to the shared
   identity database.
 - **Standalone** is for every other site. It has its own credentials, which
