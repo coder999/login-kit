@@ -32,6 +32,26 @@ CREATE TABLE `login_attempts` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `password_resets`
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `password_resets` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int(10) unsigned NOT NULL,
+  `token_hash` char(64) NOT NULL,
+  `created_at` datetime NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `used_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_token_hash` (`token_hash`),
+  KEY `idx_user_created` (`user_id`,`created_at`),
+  CONSTRAINT `fk_password_resets_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `schema_migrations`
 --
 
@@ -125,5 +145,6 @@ INSERT INTO `schema_migrations` (version) VALUES
   ('20260812174312'),
   ('20260813020513'),
   ('20260914115641'),
-  ('20261030215729');
+  ('20261030215729'),
+  ('20261106000000');
 UNLOCK TABLES;

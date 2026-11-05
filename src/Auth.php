@@ -215,6 +215,84 @@ final class Auth
         return true;
     }
 
+    /**
+     * Start a password reset. Returns a single-use token, good for an hour,
+     * or null when there is no such account or the request is throttled.
+     *
+     * The caller emails a link carrying the token and must answer the same
+     * way whether or not it got one, so the page doesn't reveal which
+     * addresses have accounts. Each request spends this client IP's
+     * failed-login budget (see loginThrottled()), and one account gets at
+     * most three tokens an hour, so the form can't be used to flood an
+     * inbox. Only the token's SHA-256 is stored.
+     */
+    public function requestPasswordReset(string $username): ?string
+    {
+        if ($this->loginThrottled()) {
+            return null;
+        }
+        $this->noteLoginFailure();
+        $st = $this->pdo->prepare('SELECT id FROM users WHERE username = ?');
+        $st->execute([$username]);
+        $user = $st->fetch(PDO::FETCH_ASSOC);
+        if ($user === false) {
+            return null;
+        }
+        $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+        $st = $this->pdo->prepare('SELECT COUNT(*) AS n FROM password_resets WHERE user_id = ? AND created_at > ?');
+        $st->execute([$user['id'], $now->modify('-1 hour')->format('Y-m-d H:i:s')]);
+        if ((int)$st->fetch(PDO::FETCH_ASSOC)['n'] >= 3) {
+            return null;
+        }
+        $token = bin2hex(random_bytes(32));
+        $this->pdo->prepare('INSERT INTO password_resets (user_id, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?)')
+            ->execute([$user['id'], hash('sha256', $token), $now->format('Y-m-d H:i:s'),
+                       $now->modify('+1 hour')->format('Y-m-d H:i:s')]);
+        return $token;
+    }
+
+    /** The user id a reset token is good for, or null if it is unknown, used or expired. */
+    public function passwordResetUser(string $token): ?int
+    {
+        $now = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->format('Y-m-d H:i:s');
+        $st = $this->pdo->prepare('SELECT user_id FROM password_resets WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?');
+        $st->execute([hash('sha256', $token), $now]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        return $row === false ? null : (int)$row['user_id'];
+    }
+
+    /**
+     * Finish a reset: set the new password, spend every outstanding token
+     * for the account, and end all of its sessions (whoever had the old
+     * password may be signed in). Returns false for a bad token. Password
+     * rules (length and so on) are the caller's to check first.
+     */
+    public function resetPassword(string $token, string $newPassword): bool
+    {
+        $userId = $this->passwordResetUser($token);
+        if ($userId === null) {
+            return false;
+        }
+        $now = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->format('Y-m-d H:i:s');
+        $this->pdo->beginTransaction();
+        try {
+            $this->pdo->prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+                ->execute([password_hash($newPassword, PASSWORD_DEFAULT), $userId]);
+            $this->pdo->prepare('UPDATE password_resets SET used_at = ? WHERE user_id = ? AND used_at IS NULL')
+                ->execute([$now, $userId]);
+            // Session data is PHP's own serialization: "user_id|i:5;" at the
+            // start of the data or straight after the previous value.
+            $key = "user_id|i:$userId;";
+            $this->pdo->prepare('DELETE FROM sessions WHERE data LIKE ? OR data LIKE ? OR data LIKE ?')
+                ->execute(["$key%", "%;$key%", "%}$key%"]);
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            $this->pdo->rollBack();
+            throw $e;
+        }
+        return true;
+    }
+
     public function logout(): void
     {
         $this->sessionStart();

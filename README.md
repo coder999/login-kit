@@ -104,6 +104,32 @@ The budget is keyed on IP alone, not on the credential type, so every
 credential on one address shares a single lockout: enough failed passkey
 attempts will also lock out password login from that address.
 
+### Password reset
+
+Three methods; the consuming app owns the pages and sends the email.
+
+```php
+// Forgot-password form. Answer the same way whether or not a token came
+// back, so the page doesn't reveal which addresses have accounts.
+if ($token = $auth->requestPasswordReset($email)) {
+    send_mail($email, 'Reset your password', "https://example.com/reset.php?token=$token");
+}
+// Reset page: show the form only for a live token, then set the password.
+if ($auth->passwordResetUser($token) === null) { /* expired or used */ }
+$auth->resetPassword($token, $newPassword);   // false for a bad token
+```
+
+- A token is 64 hex characters, single-use, good for an hour. Only its
+  SHA-256 is stored (`password_resets`, migration
+  `20261106000000_add_password_resets`).
+- Each request spends the client IP's failed-login budget (above), and one
+  account gets at most three tokens an hour.
+- A successful reset spends every outstanding token for the account and
+  deletes all of its rows in `sessions` (the database session handler's
+  table), so whoever had the old password is signed out.
+- Password rules (minimum length and so on) are the caller's to check
+  before `resetPassword()`.
+
 ## Passkeys
 
 Passkeys are an additional login path alongside passwords. Construct
@@ -180,6 +206,11 @@ Import that endpoint as an ES module and call `registerPasskey()` or
 `loginWithPasskey()`. Passkeys require a secure browser context and this
 library accepts only HTTPS origins. Plain-HTTP local development therefore
 uses the existing password login path.
+
+## Upgrading to 0.7.0
+
+0.7.0 adds password reset (above). Apply migration
+`20261106000000_add_password_resets` before using it; nothing else changes.
 
 ## Upgrading to 0.6.0
 
