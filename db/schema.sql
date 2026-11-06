@@ -115,6 +115,8 @@ CREATE TABLE `users` (
   `last_login` datetime DEFAULT NULL,
   `webauthn_user_handle` varchar(64) DEFAULT NULL,
   `role` varchar(32) NOT NULL DEFAULT 'user',
+  `is_ai_agent` tinyint(1) NOT NULL DEFAULT 0,
+  `agent_until` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`),
   UNIQUE KEY `uniq_webauthn_user_handle` (`webauthn_user_handle`)
@@ -146,5 +148,6 @@ INSERT INTO `schema_migrations` (version) VALUES
   ('20260813020513'),
   ('20260914115641'),
   ('20261030215729'),
-  ('20261106000000');
+  ('20261106000000'),
+  ('20261107000000');
 UNLOCK TABLES;

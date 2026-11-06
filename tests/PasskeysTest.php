@@ -33,7 +33,7 @@ final class PasskeysTest extends TestCase
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             last_login TEXT NULL,
             webauthn_user_handle TEXT NULL UNIQUE,
-            role TEXT NOT NULL DEFAULT \'user\'
+            role TEXT NOT NULL DEFAULT \'user\', is_ai_agent INTEGER NOT NULL DEFAULT 0, agent_until TEXT NULL
         )');
         $this->pdo->exec('CREATE TABLE user_credentials (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

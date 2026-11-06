@@ -11,12 +11,17 @@ final class Auth
     /** The role that passes every hasRole() check. */
     public const SUPERADMIN = 'superadmin';
 
+    /** lastRefusal(): the credential was right, but AI agent access is off. */
+    public const AGENT_ACCESS_OFF = 'agent_access_off';
+
     private PDO $pdo;
     private string $cookieName;
     private string $cookieDomain;
     private bool $cookieSecure;
     private int $loginMaxAttempts;
     private int $loginWindowSeconds;
+    private bool $agentAccessDefault;
+    private ?string $lastRefusal = null;
 
     public function __construct(PDO $pdo, array $options = [])
     {
@@ -29,6 +34,9 @@ final class Auth
         $this->cookieSecure = $options['cookie_secure'] ?? true;
         $this->loginMaxAttempts = $options['login_max_attempts'] ?? 8;
         $this->loginWindowSeconds = $options['login_window_seconds'] ?? 900;
+        // Whether AI agents may sign in before a superadmin has ever used
+        // setAgentAccess(). Pass true in local dev only.
+        $this->agentAccessDefault = $options['agent_access_default'] ?? false;
     }
 
     /**
@@ -70,13 +78,18 @@ final class Auth
         if (empty($_SESSION['user_id'])) {
             return null;
         }
-        $st = $this->pdo->prepare('SELECT id, username, role, last_login FROM users WHERE id = ?');
+        $st = $this->pdo->prepare('SELECT id, username, role, last_login, is_ai_agent FROM users WHERE id = ?');
         $st->execute([$_SESSION['user_id']]);
         $user = $st->fetch(PDO::FETCH_ASSOC);
         if ($user === false) {
             return null;
         }
         $user['id'] = (int)$user['id'];
+        $user['is_ai_agent'] = (bool)$user['is_ai_agent'];
+        if ($user['is_ai_agent'] && $this->agentAccessUntil() === null) {
+            unset($_SESSION['user_id']);    // switching access off ends a live agent session too
+            return null;
+        }
         return $user;
     }
 
@@ -174,6 +187,7 @@ final class Auth
     public function attemptLogin(string $username, string $password): bool
     {
         $this->sessionStart();
+        $this->lastRefusal = null;
         $st = $this->pdo->prepare('SELECT * FROM users WHERE username = ?');
         $st->execute([$username]);
         $user = $st->fetch(PDO::FETCH_ASSOC);
@@ -203,9 +217,15 @@ final class Auth
     public function loginAs(int $userId): bool
     {
         $this->sessionStart();
-        $st = $this->pdo->prepare('SELECT id FROM users WHERE id = ?');
+        $this->lastRefusal = null;
+        $st = $this->pdo->prepare('SELECT id, is_ai_agent FROM users WHERE id = ?');
         $st->execute([$userId]);
-        if ($st->fetch(PDO::FETCH_ASSOC) === false) {
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if ($row === false) {
+            return false;
+        }
+        if ($row['is_ai_agent'] && $this->agentAccessUntil() === null) {
+            $this->lastRefusal = self::AGENT_ACCESS_OFF;
             return false;
         }
         session_regenerate_id(true);
@@ -291,6 +311,54 @@ final class Auth
             throw $e;
         }
         return true;
+    }
+
+    /**
+     * Why the last attemptLogin()/loginAs() (or passkey sign-in) refused a
+     * correct credential: AGENT_ACCESS_OFF, or null. Only meaningful right
+     * after a refusal, so a page can say "agent access is off" without
+     * revealing which addresses are agents to someone without the password.
+     */
+    public function lastRefusal(): ?string
+    {
+        return $this->lastRefusal;
+    }
+
+    /**
+     * Until when AI agent accounts (users.is_ai_agent) may sign in, as a UTC
+     * 'Y-m-d H:i:s', or null for not now. Never switched: '9999-12-31
+     * 23:59:59' with the agent_access_default option, else null.
+     */
+    public function agentAccessUntil(): ?string
+    {
+        $until = $this->pdo->query('SELECT MAX(agent_until) FROM users WHERE is_ai_agent = 1')->fetchColumn();
+        if ($until === null || $until === false) {
+            return $this->agentAccessDefault ? '9999-12-31 23:59:59' : null;
+        }
+        return $until > $this->utc() ? $until : null;
+    }
+
+    /**
+     * Switch AI agent sign-in on for $hours, or off with 0 (which also ends
+     * agents' live sessions on their next request). Only a superadmin who
+     * is not an agent may: an agent must never extend its own access.
+     * Returns false, changing nothing, for anyone else.
+     */
+    public function setAgentAccess(int $hours): bool
+    {
+        $me = $this->currentUser();
+        if ($me === null || $me['role'] !== self::SUPERADMIN || $me['is_ai_agent']) {
+            return false;
+        }
+        // Off is a past time, not NULL, so agent_access_default can't switch it back on.
+        $this->pdo->prepare('UPDATE users SET agent_until = ? WHERE is_ai_agent = 1')
+            ->execute([$this->utc($hours > 0 ? $hours * 3600 : -1)]);
+        return true;
+    }
+
+    private function utc(int $offsetSeconds = 0): string
+    {
+        return gmdate('Y-m-d H:i:s', time() + $offsetSeconds);
     }
 
     public function logout(): void

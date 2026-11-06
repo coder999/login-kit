@@ -20,7 +20,7 @@ final class PasswordResetTest extends TestCase
         $this->pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
         $this->pdo->exec('CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, last_login TEXT NULL,
-            role TEXT NOT NULL DEFAULT \'user\')');
+            role TEXT NOT NULL DEFAULT \'user\', is_ai_agent INTEGER NOT NULL DEFAULT 0, agent_until TEXT NULL)');
         $this->pdo->exec('CREATE TABLE login_attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, ip TEXT NOT NULL, attempted_at TEXT NOT NULL)');
         $this->pdo->exec('CREATE TABLE sessions (id TEXT PRIMARY KEY, data TEXT NOT NULL, last_activity TEXT NOT NULL)');
         $this->pdo->exec('CREATE TABLE password_resets (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,

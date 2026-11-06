@@ -25,7 +25,7 @@ final class AuthTest extends TestCase
             password_hash TEXT NOT NULL,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             last_login TEXT NULL,
-            role TEXT NOT NULL DEFAULT \'user\'
+            role TEXT NOT NULL DEFAULT \'user\', is_ai_agent INTEGER NOT NULL DEFAULT 0, agent_until TEXT NULL
         )');
         $this->pdo->exec('CREATE TABLE login_attempts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

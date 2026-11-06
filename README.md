@@ -86,6 +86,7 @@ check — just call it and continue if it returns.
 | `cookie_secure`         | `true`         | Requires HTTPS to persist the cookie — set to `false` (or conditionally, as above) for plain-HTTP local dev. |
 | `login_max_attempts`    | `8`            | Failed attempts allowed per IP within `login_window_seconds` before `loginThrottled()` returns `true`. |
 | `login_window_seconds`  | `900`          | Rolling window (seconds) that `login_max_attempts` is counted over. |
+| `agent_access_default`  | `false`        | Whether AI agent accounts may sign in before anyone has used `setAgentAccess()`. Pass `true` in local dev only. |
 
 ### Sharing the login throttle
 
@@ -129,6 +130,35 @@ $auth->resetPassword($token, $newPassword);   // false for a bad token
   table), so whoever had the old password is signed out.
 - Password rules (minimum length and so on) are the caller's to check
   before `resetPassword()`.
+
+### AI agent accounts
+
+Real logins that coding agents (Claude, Codex) use to test a live site.
+Mark an account with `users.is_ai_agent = 1`; it can then sign in only while
+a superadmin has switched agent access on.
+
+```php
+// Login page: after a refused correct password, say why. Never say it after
+// a wrong one, or the form reveals which addresses are agents.
+if (!$auth->attemptLogin($email, $password)) {
+    $error = $auth->lastRefusal() === Auth::AGENT_ACCESS_OFF
+        ? 'AI agent access is switched off.' : 'Wrong email or password.';
+}
+// Admin page: the switch. False (nothing changed) unless the signed-in user
+// is a superadmin who is not an agent: an agent can't extend its own access.
+$auth->setAgentAccess(8);    // on for 8 hours, then off by itself
+$auth->setAgentAccess(0);    // off now
+$auth->agentAccessUntil();   // UTC 'Y-m-d H:i:s', or null when off
+```
+
+- Enforced inside the library: `loginAs()` refuses a locked-out agent, so
+  password and passkey sign-in both stop, and `currentUser()` ends a live
+  agent session (returns null) once access is off.
+- One switch covers every agent account. Never switched, it follows the
+  `agent_access_default` option.
+- `currentUser()` includes `is_ai_agent` (bool). Hiding agents from the
+  app's own lists of people is the app's job.
+- Migration `20261107000000_add_ai_agents`.
 
 ## Passkeys
 
@@ -206,6 +236,13 @@ Import that endpoint as an ES module and call `registerPasskey()` or
 `loginWithPasskey()`. Passkeys require a secure browser context and this
 library accepts only HTTPS origins. Plain-HTTP local development therefore
 uses the existing password login path.
+
+## Upgrading to 0.8.0
+
+0.8.0 adds AI agent accounts (above). Apply migration
+`20261107000000_add_ai_agents` **before** deploying 0.8.0: `currentUser()`
+and `loginAs()` read `users.is_ai_agent`, so sign-in fails without it.
+Nothing changes for accounts that aren't agents.
 
 ## Upgrading to 0.7.0
 
