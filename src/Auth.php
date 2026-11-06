@@ -192,7 +192,9 @@ final class Auth
         $st->execute([$username]);
         $user = $st->fetch(PDO::FETCH_ASSOC);
 
-        if ($user !== false && password_verify($password, $user['password_hash'])) {
+        // A NULL password_hash is an account that has no password yet (an app
+        // inviting people before they choose one): never a match.
+        if ($user !== false && $user['password_hash'] !== null && password_verify($password, $user['password_hash'])) {
             $this->clearLoginFailures();
             // loginAs() owns the whole "establish a session" step, including
             // deciding the user still exists. Reporting success when it

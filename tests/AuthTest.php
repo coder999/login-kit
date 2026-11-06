@@ -120,6 +120,20 @@ final class AuthTest extends TestCase
     }
 
     #[RunInSeparateProcess]
+    public function testAttemptLoginRefusesAnAccountWithNoPasswordYet(): void
+    {
+        $this->pdo->exec('DROP TABLE users');
+        $this->pdo->exec('CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, last_login TEXT NULL,
+            role TEXT NOT NULL DEFAULT \'user\', is_ai_agent INTEGER NOT NULL DEFAULT 0, agent_until TEXT NULL)');
+        $this->pdo->exec("INSERT INTO users (id, username, password_hash) VALUES (1, 'invited', NULL)");
+
+        $this->assertFalse($this->auth->attemptLogin('invited', ''));
+        $this->assertArrayNotHasKey('user_id', $_SESSION);
+        $this->assertSame(1, (int)$this->pdo->query('SELECT COUNT(*) FROM login_attempts')->fetchColumn());
+    }
+
+    #[RunInSeparateProcess]
     public function testAttemptLoginFailsWithWrongPasswordAndRecordsAttempt(): void
     {
         $this->pdo->prepare('INSERT INTO users (id, username, password_hash) VALUES (1, ?, ?)')
