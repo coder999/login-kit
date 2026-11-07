@@ -159,6 +159,21 @@ $auth->agentAccessUntil();   // UTC 'Y-m-d H:i:s', or null when off
 - `currentUser()` includes `is_ai_agent` (bool). Hiding agents from the
   app's own lists of people is the app's job.
 - Migration `20261107000000_add_ai_agents`.
+- **Say where the agent's password lives, beside the switch.** Every fleet
+  site shows one line under its agent access control, so whoever switches
+  access on can hand the login over without hunting for it:
+
+  ```php
+  <p>Agent sign-in: <?= h(implode(', ', $agentUsernames)) ?: 'none yet' ?>
+    &middot; password in 1Password (vault hal9000): &ldquo;<?= h(AGENT_1PASSWORD_ITEM) ?>&rdquo;</p>
+  ```
+
+  Keep the item name in config, never the secret. Examples: dash
+  (`admin/admins.php`), diaslab (`auth/account.php`), qbank (`account.php`),
+  admin.marktuttle.dev (`accounts.php`).
+- **Which accounts are agents is never settable from a web page.** Set
+  `is_ai_agent` with a CLI (schedulemd's `bin/add_user.php --agent`) or in the
+  database. A button can flag the wrong account, the operator's own included.
 
 ## Passkeys
 
