@@ -131,6 +131,20 @@ $auth->resetPassword($token, $newPassword);   // false for a bad token
 - Password rules (minimum length and so on) are the caller's to check
   before `resetPassword()`.
 
+**Invitations** use the same token, issued by an administrator instead of
+requested by a visitor:
+
+```php
+// Admin-only page: the app has already created the account.
+$token = $auth->issueSetPasswordToken($userId, 7 * 24);   // hours, 1..720
+send_mail($email, 'You are invited', "https://example.com/reset.php?token=$token");
+```
+
+It is not throttled and spends no failed-login budget, so it must only be
+reachable by an administrator; a public form uses `requestPasswordReset()`.
+The account's `password_hash` can be `''` until then: an empty hash never
+matches a password. The invited person finishes on the same reset page.
+
 ### AI agent accounts
 
 Real logins that coding agents (Claude, Codex) use to test a live site.

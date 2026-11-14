@@ -266,10 +266,40 @@ final class Auth
         if ((int)$st->fetch(PDO::FETCH_ASSOC)['n'] >= 3) {
             return null;
         }
+        return $this->insertToken((int)$user['id'], 1);
+    }
+
+    /**
+     * Issue a set-password token for an account an administrator is
+     * inviting, good for $ttlHours (at most 30 days). The token is finished
+     * exactly like a reset: passwordResetUser(), then resetPassword().
+     *
+     * Unlike requestPasswordReset() this is not throttled and spends no
+     * failed-login budget, because no visitor asked for it. Call it ONLY from
+     * a page restricted to an administrator; a form anyone can reach must use
+     * requestPasswordReset(). Throws for an unknown user id or a bad TTL.
+     * Only the token's SHA-256 is stored.
+     */
+    public function issueSetPasswordToken(int $userId, int $ttlHours): string
+    {
+        if ($ttlHours < 1 || $ttlHours > 720) {
+            throw new \InvalidArgumentException('ttlHours must be between 1 and 720.');
+        }
+        $st = $this->pdo->prepare('SELECT id FROM users WHERE id = ?');
+        $st->execute([$userId]);
+        if ($st->fetch(PDO::FETCH_ASSOC) === false) {
+            throw new \InvalidArgumentException("No user $userId.");
+        }
+        return $this->insertToken($userId, $ttlHours);
+    }
+
+    private function insertToken(int $userId, int $ttlHours): string
+    {
+        $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
         $token = bin2hex(random_bytes(32));
         $this->pdo->prepare('INSERT INTO password_resets (user_id, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?)')
-            ->execute([$user['id'], hash('sha256', $token), $now->format('Y-m-d H:i:s'),
-                       $now->modify('+1 hour')->format('Y-m-d H:i:s')]);
+            ->execute([$userId, hash('sha256', $token), $now->format('Y-m-d H:i:s'),
+                       $now->modify("+$ttlHours hours")->format('Y-m-d H:i:s')]);
         return $token;
     }
 

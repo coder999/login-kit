@@ -73,7 +73,8 @@ The package can be deployed two ways. The reasoning is recorded in
   schema DDL into an app's startup code.
 - Account provisioning, account recovery, email verification, and public
   signup are app responsibilities. The library provides no public signup
-  flow. Enrolling a passkey attaches a credential to an existing account.
+  flow; `issueSetPasswordToken()` gives an administrator's invitation its
+  set-password link (README, "Password reset"). Enrolling a passkey attaches a credential to an existing account.
 
 ## 2. Install and bootstrap
 

@@ -109,4 +109,41 @@ final class PasswordResetTest extends TestCase
         $left = $this->pdo->query('SELECT id FROM sessions ORDER BY id')->fetchAll(PDO::FETCH_COLUMN);
         $this->assertSame(['bob', 'other-key', 'signed-out'], $left);
     }
+
+    public function testInviteTokenLastsItsTtlSpendsNoBudgetAndFinishesLikeAReset(): void
+    {
+        $token = $this->auth->issueSetPasswordToken(15, 168);
+
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{64}$/', $token);
+        $this->assertSame(hash('sha256', $token), $this->pdo->query('SELECT token_hash FROM password_resets')->fetchColumn());
+        $this->assertSame(0, $this->rows('SELECT COUNT(*) FROM login_attempts'));
+        $row = $this->pdo->query('SELECT created_at, expires_at FROM password_resets')->fetch();
+        $this->assertSame(168 * 3600, strtotime($row['expires_at']) - strtotime($row['created_at']));
+
+        $this->assertSame(15, $this->auth->passwordResetUser($token));
+        $this->assertTrue($this->auth->resetPassword($token, 'a-new-password'));
+        $this->assertTrue($this->auth->attemptLogin('bob@example.com', 'a-new-password'));
+        $this->assertNull($this->auth->passwordResetUser($token));
+    }
+
+    public function testInviteTokenIsRefusedForAnUnknownUserOrABadTtl(): void
+    {
+        foreach ([[999, 24], [15, 0], [15, 721]] as [$user, $hours]) {
+            try {
+                $this->auth->issueSetPasswordToken($user, $hours);
+                $this->fail("issued a token for user $user, $hours hours");
+            } catch (\InvalidArgumentException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+        $this->assertSame(0, $this->rows('SELECT COUNT(*) FROM password_resets'));
+    }
+
+    public function testInviteTokenThatHasExpiredIsDead(): void
+    {
+        $token = $this->auth->issueSetPasswordToken(15, 1);
+        $this->pdo->exec("UPDATE password_resets SET expires_at = '2000-01-01 00:00:00'");
+        $this->assertNull($this->auth->passwordResetUser($token));
+        $this->assertFalse($this->auth->resetPassword($token, 'a-new-password'));
+    }
 }
