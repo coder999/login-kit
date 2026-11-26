@@ -87,6 +87,7 @@ check — just call it and continue if it returns.
 | `login_max_attempts`    | `8`            | Failed attempts allowed per IP within `login_window_seconds` before `loginThrottled()` returns `true`. |
 | `login_window_seconds`  | `900`          | Rolling window (seconds) that `login_max_attempts` is counted over. |
 | `agent_access_default`  | `false`        | Whether AI agent accounts may sign in before anyone has used `setAgentAccess()`. Pass `true` in local dev only. |
+| `session_lifetime`      | `0`            | Seconds a sign-in lasts: the cookie's lifetime and `session.gc_maxlifetime`, so idle sessions last as long too. `0` keeps PHP's defaults (a browser-session cookie, 24 min idle). Switching agent access off still ends an agent's session. |
 
 ### Sharing the login throttle
 

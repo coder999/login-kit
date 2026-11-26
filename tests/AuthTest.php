@@ -55,6 +55,17 @@ final class AuthTest extends TestCase
     }
 
     #[RunInSeparateProcess]
+    public function testSessionLifetimeSetsCookieAndIdleLimit(): void
+    {
+        $auth = new Auth($this->pdo, ['cookie_domain' => '.nexus.local', 'session_lifetime' => 2592000]);
+        session_write_close();
+        $auth->sessionStart();
+
+        $this->assertSame(2592000, session_get_cookie_params()['lifetime']);
+        $this->assertSame('2592000', ini_get('session.gc_maxlifetime'));
+    }
+
+    #[RunInSeparateProcess]
     public function testCurrentUserReturnsUserWhenSessionHasUserId(): void
     {
         $this->pdo->prepare('INSERT INTO users (id, username, password_hash) VALUES (1, ?, ?)')

@@ -21,6 +21,7 @@ final class Auth
     private int $loginMaxAttempts;
     private int $loginWindowSeconds;
     private bool $agentAccessDefault;
+    private int $sessionLifetime;
     private ?string $lastRefusal = null;
 
     public function __construct(PDO $pdo, array $options = [])
@@ -37,6 +38,9 @@ final class Auth
         // Whether AI agents may sign in before a superadmin has ever used
         // setAgentAccess(). Pass true in local dev only.
         $this->agentAccessDefault = $options['agent_access_default'] ?? false;
+        // Seconds a sign-in lasts. 0: until the browser closes, or PHP's
+        // session.gc_maxlifetime (24 min by default) of idleness.
+        $this->sessionLifetime = $options['session_lifetime'] ?? 0;
     }
 
     /**
@@ -61,8 +65,11 @@ final class Auth
             return;
         }
         session_name($this->cookieName);
+        if ($this->sessionLifetime > 0) {
+            ini_set('session.gc_maxlifetime', (string)$this->sessionLifetime);
+        }
         session_set_cookie_params([
-            'lifetime' => 0,
+            'lifetime' => $this->sessionLifetime,
             'path'     => '/',
             'domain'   => $this->cookieDomain,
             'secure'   => $this->cookieSecure,
