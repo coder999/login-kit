@@ -17,6 +17,29 @@
 /*M!100616 SET @OLD_NOTE_VERBOSITY=@@NOTE_VERBOSITY, NOTE_VERBOSITY=0 */;
 
 --
+-- Table structure for table `api_tokens`
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `api_tokens` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int(10) unsigned NOT NULL,
+  `name` varchar(80) NOT NULL,
+  `token_hash` char(64) NOT NULL,
+  `scopes` varchar(255) NOT NULL,
+  `created_at` datetime NOT NULL,
+  `expires_at` datetime DEFAULT NULL,
+  `last_used_at` datetime DEFAULT NULL,
+  `revoked_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_api_token_hash` (`token_hash`),
+  KEY `idx_api_tokens_user` (`user_id`),
+  CONSTRAINT `fk_api_tokens_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `login_attempts`
 --
 
@@ -149,5 +172,6 @@ INSERT INTO `schema_migrations` (version) VALUES
   ('20260914115641'),
   ('20261030215729'),
   ('20261106000000'),
-  ('20261107000000');
+  ('20261107000000'),
+  ('20261127000000');
 UNLOCK TABLES;

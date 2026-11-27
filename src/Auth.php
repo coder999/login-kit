@@ -395,6 +395,107 @@ final class Auth
         return true;
     }
 
+    /** Every API token starts with this, so a leaked one is recognisable (and greppable). */
+    public const API_TOKEN_PREFIX = 'lkt_';
+
+    /**
+     * Make an API token for the signed-in user: a long-lived bearer token
+     * for a device or script, good only for $scopes (each like 'admin:wall':
+     * lowercase letters, digits, ':', '_', '-'), for $ttlDays or with no
+     * expiry. Returns the token, which is shown once and never stored, or
+     * null, changing nothing, when no one is signed in or the signed-in
+     * account is an AI agent (an agent must never mint its own access).
+     * Throws for a bad name, scope or TTL.
+     *
+     * The caller decides who may reach this at all (admin keeps it on a
+     * superadmin page) and which scopes a page may offer.
+     */
+    public function issueApiToken(string $name, array $scopes, ?int $ttlDays = null): ?string
+    {
+        $name = trim($name);
+        if ($name === '' || mb_strlen($name) > 80) {
+            throw new \InvalidArgumentException('A token name is 1 to 80 characters.');
+        }
+        $scopes = array_values(array_unique($scopes));
+        if ($scopes === [] || array_filter($scopes, static fn ($s) => !is_string($s) || !preg_match('/^[a-z0-9:_-]{1,40}$/', $s))
+            || strlen(implode(' ', $scopes)) > 255) {
+            throw new \InvalidArgumentException('Scopes are 1 to 40 of a-z 0-9 : _ - each.');
+        }
+        if ($ttlDays !== null && ($ttlDays < 1 || $ttlDays > 3650)) {
+            throw new \InvalidArgumentException('ttlDays must be between 1 and 3650.');
+        }
+        $me = $this->currentUser();
+        if ($me === null || $me['is_ai_agent']) {
+            return null;
+        }
+        $token = self::API_TOKEN_PREFIX . bin2hex(random_bytes(32));
+        $this->pdo->prepare('INSERT INTO api_tokens (user_id, name, token_hash, scopes, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)')
+            ->execute([$me['id'], $name, hash('sha256', $token), implode(' ', $scopes), $this->utc(),
+                       $ttlDays === null ? null : $this->utc($ttlDays * 86400)]);
+        return $token;
+    }
+
+    /**
+     * The signed-in user's API tokens, newest first, without their hashes:
+     * id, name, scopes (list), created_at, expires_at, last_used_at,
+     * revoked_at (UTC 'Y-m-d H:i:s' or null). [] when no one is signed in.
+     */
+    public function apiTokens(): array
+    {
+        $me = $this->currentUser();
+        if ($me === null) {
+            return [];
+        }
+        $st = $this->pdo->prepare('SELECT id, name, scopes, created_at, expires_at, last_used_at, revoked_at FROM api_tokens WHERE user_id = ? ORDER BY id DESC');
+        $st->execute([$me['id']]);
+        return array_map(static fn ($r) => ['id' => (int)$r['id'], 'scopes' => explode(' ', $r['scopes'])] + $r, $st->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    /**
+     * Revoke one of the signed-in user's tokens, effective on its next use.
+     * False, changing nothing, for no one signed in, an AI agent, someone
+     * else's token, or one already revoked.
+     */
+    public function revokeApiToken(int $tokenId): bool
+    {
+        $me = $this->currentUser();
+        if ($me === null || $me['is_ai_agent']) {
+            return false;
+        }
+        $st = $this->pdo->prepare('UPDATE api_tokens SET revoked_at = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL');
+        $st->execute([$this->utc(), $tokenId, $me['id']]);
+        return $st->rowCount() === 1;
+    }
+
+    /**
+     * Who an API token speaks for, if it is good for $scope: the owner's id,
+     * username and role plus token_id and token_name, or null for a
+     * malformed, unknown, revoked or expired token, one without $scope, or
+     * one whose owner is (now) an AI agent. Reads no session and starts
+     * none: call it from bearer-only endpoints. Notes last_used_at, at most
+     * once a minute.
+     */
+    public function apiTokenUser(string $token, string $scope): ?array
+    {
+        if (!preg_match('/^' . self::API_TOKEN_PREFIX . '[0-9a-f]{64}$/', $token)) {
+            return null;
+        }
+        $st = $this->pdo->prepare('SELECT t.id AS token_id, t.name AS token_name, t.scopes, t.expires_at, t.revoked_at, t.last_used_at,
+            u.id, u.username, u.role, u.is_ai_agent FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ?');
+        $st->execute([hash('sha256', $token)]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        $now = $this->utc();
+        if ($row === false || $row['revoked_at'] !== null || ($row['expires_at'] !== null && $row['expires_at'] <= $now)
+            || (bool)$row['is_ai_agent'] || !in_array($scope, explode(' ', $row['scopes']), true)) {
+            return null;
+        }
+        if ($row['last_used_at'] === null || $row['last_used_at'] <= $this->utc(-60)) {
+            $this->pdo->prepare('UPDATE api_tokens SET last_used_at = ? WHERE id = ?')->execute([$now, $row['token_id']]);
+        }
+        return ['id' => (int)$row['id'], 'username' => $row['username'], 'role' => $row['role'],
+                'token_id' => (int)$row['token_id'], 'token_name' => $row['token_name']];
+    }
+
     private function utc(int $offsetSeconds = 0): string
     {
         return gmdate('Y-m-d H:i:s', time() + $offsetSeconds);

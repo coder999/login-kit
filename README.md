@@ -190,6 +190,33 @@ $auth->agentAccessUntil();   // UTC 'Y-m-d H:i:s', or null when off
   `is_ai_agent` with a CLI (schedulemd's `bin/add_user.php --agent`) or in the
   database. A button can flag the wrong account, the operator's own included.
 
+### API tokens
+
+Long-lived, revocable bearer tokens a user makes for a device or a script
+(a wall display, a cron job), each good only for named scopes. The app
+names the scopes (`admin:wall`) and decides which a page may offer.
+
+```php
+// Account page (keep it behind your own role check): make one. The token is
+// returned once and only its SHA-256 is stored, so show it now or never.
+$token = $auth->issueApiToken('Rack kiosk', ['admin:wall'], 365);   // or null TTL: no expiry
+$auth->apiTokens();          // the signed-in user's: id, name, scopes, created/expires/last used/revoked
+$auth->revokeApiToken($id);  // the owner's own only; effective on next use
+
+// Bearer-only endpoint: never read a session here.
+$h = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+$who = str_starts_with($h, 'Bearer ') ? $auth->apiTokenUser(substr($h, 7), 'admin:wall') : null;
+if ($who === null) { http_response_code(401); exit; }
+```
+
+- Tokens look like `lkt_` + 64 hex, so a leaked one is easy to recognise.
+- `apiTokenUser()` refuses malformed, unknown, revoked and expired tokens,
+  tokens without the scope asked for, and **any token whose owner is an AI
+  agent account**. It notes `last_used_at` at most once a minute.
+- An AI agent can't mint or revoke tokens (`issueApiToken()` returns null,
+  `revokeApiToken()` false), like `setAgentAccess()`.
+- Migration `20261127000000_add_api_tokens`.
+
 ## Passkeys
 
 Passkeys are an additional login path alongside passwords. Construct
@@ -266,6 +293,12 @@ Import that endpoint as an ES module and call `registerPasskey()` or
 `loginWithPasskey()`. Passkeys require a secure browser context and this
 library accepts only HTTPS origins. Plain-HTTP local development therefore
 uses the existing password login path.
+
+## Upgrading to 0.11.0
+
+0.11.0 adds API tokens (above). Apply migration
+`20261127000000_add_api_tokens` before using them; nothing else reads the
+table, so existing sign-in is unaffected either way.
 
 ## Upgrading to 0.8.0
 
